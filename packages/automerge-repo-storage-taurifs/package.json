@@ -1,0 +1,38 @@
+{
+    "name": "@jcc333/automerge-repo-storage-taurifs",
+    "version": "0.1.0",
+    "description": "Tauri-api-based filesystem storage adapter for Automerge Repo",
+    "author": "James Clemer/jcc333 <clemer19@gmail.com>",
+    "license": "MIT",
+    "type": "module",
+    "main": "dist/index.js",
+    "scripts": {
+        "build": "tsc",
+        "watch": "npm-watch"
+    },
+    "dependencies": {
+        "@automerge/automerge": "^2.1.9",
+        "@automerge/automerge-repo": "^1.1.0-alpha.7",
+        "@tauri-apps/api": "^1.5.3"
+    },
+    "devDependencies": {
+        "@types/node": "^20.8.2",
+        "@types/lodash": "^4.14.199",
+        "@typescript-eslint/eslint-plugin": "^6.0.0",
+        "@typescript-eslint/parser": "^6.0.0",
+        "typescript": "^5.0.2",
+        "eslint": "^8.45.0",
+        "tsc-alias": "^1.8.8"
+    },
+    "watch": {
+        "build": {
+            "patterns": "./src/**/*",
+            "extensions": [
+                ".ts"
+            ]
+        }
+    },
+    "publishConfig": {
+        "access": "public"
+    }
+}
