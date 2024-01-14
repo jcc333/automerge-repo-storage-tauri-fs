@@ -1,3 +1,17 @@
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App.tsx'
+import './index.css'
+import { isValidAutomergeUrl, Repo } from '@automerge/automerge-repo'
+import { BroadcastChannelNetworkAdapter } from '@automerge/automerge-repo-network-broadcastchannel'
+//import { TauriFileSystemStorageAdapter } from "@jcc333/automerge-repo-storage-taurifs"
+import {next as A} from "@automerge/automerge"
+import { RepoContext } from '@automerge/automerge-repo-react-hooks'
+//import * as path from "@tauri-apps/api/path"
+//import * as fs from "@tauri-apps/api/fs"
+
+
+/*BEGIN*/
 import { StorageAdapter, StorageKey, Chunk } from "@automerge/automerge-repo"
 import * as path from "@tauri-apps/api/path"
 import * as fs from "@tauri-apps/api/fs"
@@ -100,10 +114,14 @@ export class TauriFileSystemStorageAdapter extends StorageAdapter {
     private async loadFile(storageKey: StorageKey): Promise<undefined | Uint8Array> {
         const filePath = await this.getFilePath(storageKey)
         const isExistingFile = await fs.exists(filePath)
-        const contents = isExistingFile ? new Uint8Array(await fs.readBinaryFile(filePath)) : undefined
-        const op = "loadFile"
-        console.log({op, storageKey, filePath, isExistingFile, contents})
-        return contents
+        if (isExistingFile) {
+            const contents = await fs.readBinaryFile(filePath)
+            const op = "loadFile"
+            console.log({op, storageKey, filePath, isExistingFile, contents})
+            return new Uint8Array(contents)
+        } else {
+            return undefined
+        }
     }
 
     private async saveCache(storageKey: StorageKey, binary: Uint8Array): Promise<void> {
@@ -362,3 +380,39 @@ const walkdir = async (dirPath: string): Promise<string[]> => {
       return []
     }
 }
+
+
+/*END*/
+
+const appDir = await path.appDir()
+const repoDir = await path.resolve(appDir, "counter-repo-data")
+console.log(`repoDir is at ${repoDir}`)
+await fs.createDir(repoDir, { recursive: true })
+
+const repo = new Repo({
+  network: [new BroadcastChannelNetworkAdapter()],
+  storage: new TauriFileSystemStorageAdapter(repoDir),
+})
+
+const rootDocUrl = `${document.location.hash.substr(1)}`
+let handle
+if (isValidAutomergeUrl(rootDocUrl)) {
+    console.log(`Finding ${rootDocUrl}`)
+    handle = repo.find(rootDocUrl)
+} else {
+    console.log(`Creating a doc...`)
+    handle = repo.create<{counter?: A.Counter}>()
+    console.log(`Created a doc at ${handle.url}`)
+    handle.change(d => d.counter = new A.Counter())
+}
+const docUrl = document.location.hash = handle.url
+// @ts-ignore
+window.handle = handle // we'll use this later for experimentation
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <RepoContext.Provider value={repo}>
+      <App docUrl={docUrl}/>
+    </RepoContext.Provider>
+  </React.StrictMode>,
+)
