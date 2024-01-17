@@ -13,7 +13,14 @@ export class TauriFileSystemStorageAdapter extends StorageAdapter {
     }
 
     async load(storageKey: StorageKey): Promise<undefined | Uint8Array> {
-        return Promise.race([this.loadCache(storageKey), this.loadFile(storageKey)])
+        let result = await this.loadCache(storageKey)
+        if (!result) {
+            result = this.loadFile(storageKey)
+            if (result) {
+                await this.saveCache(storageKey, result)
+            }
+        }
+        return result
     }
 
     async save(storageKey: StorageKey, binary: Uint8Array): Promise<void> {
@@ -61,8 +68,6 @@ export class TauriFileSystemStorageAdapter extends StorageAdapter {
                 return { data, key }
             })
         )
-        const op = "loadRange"
-        console.log({op, keyPrefix, diskKeys, cachedKeys, chunks})
         return chunks
     }
 
@@ -100,10 +105,10 @@ export class TauriFileSystemStorageAdapter extends StorageAdapter {
     private async loadFile(storageKey: StorageKey): Promise<undefined | Uint8Array> {
         const filePath = await this.getFilePath(storageKey)
         const isExistingFile = await fs.exists(filePath)
-        const contents = isExistingFile ? new Uint8Array(await fs.readBinaryFile(filePath)) : undefined
-        const op = "loadFile"
-        console.log({op, storageKey, filePath, isExistingFile, contents})
-        return contents
+        if (isExistingFile) {
+            const contents = await fs.readBinaryFile(filePath)
+            return contents
+        }
     }
 
     private async saveCache(storageKey: StorageKey, binary: Uint8Array): Promise<void> {
@@ -112,10 +117,8 @@ export class TauriFileSystemStorageAdapter extends StorageAdapter {
     }
 
     private async saveFile(storageKey: StorageKey, binary: Uint8Array): Promise<void> {
-        const op = "saveFile"
         const filePath = await this.getFilePath(storageKey)
         const filePathDir = await path.dirname(filePath)
-        console.log({op, storageKey, filePath, filePathDir})
         await fs.createDir(filePathDir, { recursive: true })
         await fs.writeBinaryFile(filePath, binary)
     }
@@ -347,18 +350,19 @@ const getKey = async (key: StorageKey): Promise<string> => await path.join(...ke
 const walkdir = async (dirPath: string): Promise<string[]> => {
     if (await fs.exists(dirPath)) {
         const entries = await fs.readDir(dirPath, { recursive: true })
-        const op = "walkdir"
         const files = await Promise.all(
-          entries.map(async entry => {
-            const subpath = await path.resolve(dirPath, entry.name)
-            console.log({op, dirPath, subpath, entry})
-            return entry.children != null ? walkdir(subpath) : subpath
-          })
+            entries.map(async entry => {
+                const subpath = await path.resolve(dirPath, entry.name)
+                if (entry.children != null) {
+                    return walkdir(subpath)
+                } else {
+                    return subpath
+                }
+            })
         )
         const flatFiles = files.flat()
-        console.log({op, dirPath, entries, files, flatFiles})
         return flatFiles
     } else {
-      return []
+        return []
     }
 }
